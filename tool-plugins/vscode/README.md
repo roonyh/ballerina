@@ -16,7 +16,7 @@ Ballerina makes it easy to build resilient services that integration and orchest
 
         - ![install from vsix](https://github.com/ballerina-platform/ballerina-lang/blob/master/tool-plugins/vscode/plugin/docs/install-from-vsix.gif?raw=true)
 
-- Configure  `ballerina.home` path in settings. You should set the Ballerina platform installed path as `ballerina.home`. ( This step is mandatory for the Ballerina VSCode plugin features to work ) 
+- Plugin will automatically identify the ballerina home and if you need to set custom path, configure  `ballerina.home` path in settings. You should set the Ballerina platform installed path as `ballerina.home`. ( This step is optional) 
     - To get to the settings in vscode use <kbd>CTRL</kbd> +  <kbd>,</kbd> in Windows and Linux and <kbd>⌘</kbd> + <kbd>,</kbd> in macOS. [More info](https://code.visualstudio.com/docs/getstarted/settings)
 
 - ![set sdk](https://github.com/ballerina-platform/ballerina-lang/blob/master/tool-plugins/vscode/plugin/docs/set-sdk.gif?raw=true)
@@ -38,7 +38,7 @@ For a complete list of features please see the Ballerina Language Server [User G
 
 Ballerina’s underlying language semantics were designed by modeling how independent parties communicate via structured interactions. Subsequently, every Ballerina program can be displayed as a sequence diagram of its flow with endpoints, including synchronous and asynchronous calls. 
 
-To view the sequence diagram of a ballerina file press the diagram icon ( ![design view icon](https://github.com/ballerina-platform/ballerina-lang/blob/master/tool-plugins/vscode/plugin/docs/design-view-icon.png?raw=true) ) in top right corner.
+To view the sequence diagram of a ballerina file press the diagram icon ( ![design view icon](https://github.com/ballerina-platform/ballerina-lang/blob/master/tool-plugins/vscode/plugin/docs/design-view-icon.png?raw=true) ) in top right corner, or execute the command `Show Diagram` from command panel. Get the command panel with <kbd>CTRL</kbd> + <kbd>SHIFT</kbd> + <kbd>P</kbd> key combination.
 
 ![opening design view](https://github.com/ballerina-platform/ballerina-lang/blob/master/tool-plugins/vscode/plugin/docs/ballerina-diagram-usage.gif?raw=true)
 
