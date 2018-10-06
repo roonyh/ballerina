@@ -12,6 +12,7 @@ export function render(context: ExtensionContext, langClient: ExtendedLangClient
         function getExamples() {
             return new Promise((resolve, reject) => {
                 webViewRPCHandler.invokeRemoteMethod('getExamples', [], (resp) => {
+                    console.log(resp.samples)
                     resolve(resp.samples);
                 });
             })

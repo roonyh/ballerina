@@ -16,45 +16,37 @@
  * under the License.
  *
  */
-import { workspace, commands, window, Uri, ViewColumn, ExtensionContext, TextEditor, WebviewPanel, TextDocumentChangeEvent, Position, Range, Selection } from 'vscode';
+import { workspace, commands, window, Uri, ViewColumn, ExtensionContext, TextEditor, WebviewPanel, TextDocumentChangeEvent } from 'vscode';
 import * as _ from 'lodash';
 import { render } from './renderer';
 import { BallerinaAST, ExtendedLangClient } from '../core/extended-language-client';
 import { BallerinaExtension } from '../core';
-import { WebViewRPCHandler } from '../utils';
 
 const DEBOUNCE_WAIT = 500;
 
 let previewPanel: WebviewPanel | undefined;
 let activeEditor: TextEditor | undefined;
-let preventDiagramUpdate = false;
 
-function updateWebView(ast: BallerinaAST, docUri: Uri, stale: boolean): void {
+function updateWebView(ast: BallerinaAST, docUri: Uri): void {
 	if (previewPanel) {
 		previewPanel.webview.postMessage({ 
 			command: 'update',
 			json: ast,
-			docUri: docUri.toString(),
-			stale
+			docUri: docUri.toString()
 		});
 	}
 }
 
-function showDiagramEditor(context: ExtensionContext, langClient: ExtendedLangClient): void {
+function showDocs(context: ExtensionContext, langClient: ExtendedLangClient): void {
 	const didChangeDisposable = workspace.onDidChangeTextDocument(
 			_.debounce((e: TextDocumentChangeEvent) => {
 		if (activeEditor && (e.document === activeEditor.document) &&
 			e.document.fileName.endsWith('.bal')) {
-			if (preventDiagramUpdate) {
-				return;
-			}
 			const docUri = e.document.uri;
 			langClient.getAST(docUri)
 				.then((resp) => {
-					let stale = true;
 					if (resp.ast) {
-						stale = false;
-						updateWebView(resp.ast, docUri, stale);
+						updateWebView(resp.ast, docUri);
 					}
 				});
 		}
@@ -69,10 +61,8 @@ function showDiagramEditor(context: ExtensionContext, langClient: ExtendedLangCl
 			const docUri = activatedEditor.document.uri;
 			langClient.getAST(docUri)
 				.then((resp) => {
-					let stale = true;
 					if (resp.ast) {
-						stale = false;
-						updateWebView(resp.ast, docUri, stale);
+						updateWebView(resp.ast, docUri);
 					}
 				});
 		}
@@ -84,8 +74,8 @@ function showDiagramEditor(context: ExtensionContext, langClient: ExtendedLangCl
 	}
 	// Create and show a new webview
 	previewPanel = window.createWebviewPanel(
-		'ballerinaDiagram',
-		"Ballerina Diagram",
+		'ballerinaDocs',
+		"Ballerina Docs",
 		{ viewColumn: ViewColumn.Two, preserveFocus: true } ,
 		{
 			enableScripts: true,
@@ -97,61 +87,18 @@ function showDiagramEditor(context: ExtensionContext, langClient: ExtendedLangCl
 		return;
 	}
 	activeEditor = editor;
-	WebViewRPCHandler.create([
-		{
-			methodName: 'getAST',
-			handler: (args: any[]) => {
-				return langClient.getAST(args[0]);
-			}
-		},
-		{
-			methodName: 'getEndpoints',
-			handler: (args: any[]) => {
-				return langClient.getEndpoints();
-			}
-		},
-		{
-			methodName: 'parseFragment',
-			handler: (args: any[]) => {
-				return langClient.parseFragment({
-					enclosingScope: args[0].enclosingScope,
-					expectedNodeType: args[0].expectedNodeType,
-					source: args[0].source
-				});
-			}
-		},
-		{
-			methodName: 'revealRange',
-			handler: (args: any[]) => {
-				if (activeEditor) {
-					const start = new Position(args[0] - 1, args[1] - 1);
-					const end = new Position(args[2] - 1, args[3]);
-					activeEditor.revealRange(new Range(start, end));
-					activeEditor.selection = new Selection(start, end);
-				}
-				return Promise.resolve();
-			}
-		}
-	], previewPanel.webview);
-	const html = render(context, langClient, editor.document.uri);
+
+	const html = render(context);
 	if (previewPanel && html) {
 		previewPanel.webview.html = html;
 	}
-	// Handle messages from the webview
-	previewPanel.webview.onDidReceiveMessage(message => {
-		switch (message.command) {
-			case 'astModified':
-				if (activeEditor && activeEditor.document.fileName.endsWith('.bal')) {
-					preventDiagramUpdate = true;
-					const ast = JSON.parse(message.ast);
-					langClient.triggerASTDidChange(ast, activeEditor.document.uri)
-						.then(() => {
-							preventDiagramUpdate = false;
-						});	
-				}
-				return;
+
+	langClient.getAST(editor.document.uri)
+	.then((resp) => {
+		if (resp.ast) {
+			updateWebView(resp.ast, editor.document.uri);
 		}
-	}, undefined, context.subscriptions);
+	});
 
 	previewPanel.onDidDispose(() => {
 		previewPanel = undefined;
@@ -163,7 +110,7 @@ function showDiagramEditor(context: ExtensionContext, langClient: ExtendedLangCl
 export function activate(ballerinaExtInstance: BallerinaExtension) {
     let context = <ExtensionContext> ballerinaExtInstance.context;
     let langClient = <ExtendedLangClient> ballerinaExtInstance.langClient;
-	const docsRenderDisposable = commands.registerCommand('ballerina.showDiagram', () => {
+	const diagramRenderDisposable = commands.registerCommand('ballerina.showDocs', () => {
 		return ballerinaExtInstance.onReady()
 		.then(() => {
 			const { experimental } = langClient.initializeResult!.capabilities;
@@ -173,7 +120,7 @@ export function activate(ballerinaExtInstance: BallerinaExtension) {
 				ballerinaExtInstance.showMessageServerMissingCapability();
 				return {};
 			}
-			showDiagramEditor(context, langClient);
+			showDocs(context, langClient);
 		})
 		.catch((e) => {
 			if (!ballerinaExtInstance.isValidBallerinaHome()) {
@@ -184,5 +131,5 @@ export function activate(ballerinaExtInstance: BallerinaExtension) {
 		});
 	});
 
-	context.subscriptions.push(docsRenderDisposable);
+	context.subscriptions.push(diagramRenderDisposable);
 }
