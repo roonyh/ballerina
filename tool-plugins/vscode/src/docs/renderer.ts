@@ -44,3 +44,17 @@ export function render(context: ExtensionContext): string {
         </html> 
     `;
 }
+
+export function renderAPIDocs() {
+    return `
+        <!doctype html>
+        <html lang="en">
+        <head>
+            <meta charset="utf-8">
+        </head>
+        <body>
+            haha
+        </body>
+        </html> 
+    `;
+}

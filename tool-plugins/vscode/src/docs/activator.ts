@@ -21,7 +21,7 @@ import {
 	ExtensionContext, TextEditor, WebviewPanel, TextDocumentChangeEvent
 } from 'vscode';
 import * as _ from 'lodash';
-import { render } from './renderer';
+import { render, renderAPIDocs } from './renderer';
 import { BallerinaAST, ExtendedLangClient } from '../core/extended-language-client';
 import { BallerinaExtension } from '../core';
 
@@ -135,4 +135,20 @@ export function activate(ballerinaExtInstance: BallerinaExtension) {
 	});
 
 	context.subscriptions.push(docsRenderDisposable);
+	
+	const APIDocsRenderDisposable = commands.registerCommand('ballerina.showAPIDocs', () => {
+		previewPanel = window.createWebviewPanel(
+			'ballerinaAPIDocs',
+			"Ballerina API Docs",
+			{ viewColumn: ViewColumn.Two, preserveFocus: true },
+			{
+				enableScripts: true,
+				retainContextWhenHidden: true,
+			}
+		);
+
+		previewPanel.webview.html = renderAPIDocs();
+	});
+
+	context.subscriptions.push(APIDocsRenderDisposable);
 }
