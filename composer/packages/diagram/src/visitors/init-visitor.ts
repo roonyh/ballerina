@@ -23,6 +23,7 @@ export const visitor: Visitor = {
     },
 
     beginVisitBlock(node: Block, parent: ASTNode) {
+        console.log(node)
         if (!node.viewState) {
             node.viewState = new BlockViewState();
         }

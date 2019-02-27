@@ -61,6 +61,7 @@ export class Diagram extends React.Component<DiagramProps, DiagramState> {
             // Set width and height to toplevel node.
             ast.viewState = cuViewState;
             // Calculate dimention of AST Nodes.
+            console.log("sizing");
             ASTUtil.traversNode(ast, sizingVisitor);
             // Calculate positions of the AST Nodes.
             ASTUtil.traversNode(ast, positioningVisitor);
@@ -114,6 +115,9 @@ export class Diagram extends React.Component<DiagramProps, DiagramState> {
             diagramHeight: diagramSize.h,
             diagramWidth: diagramSize.w,
             mode: currentMode,
+            update: () => {
+                this.forceUpdate();
+            },
             zoomFit: () => {
                 this.setState({
                     currentZoom: 1
