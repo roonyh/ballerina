@@ -41,6 +41,7 @@ import org.ballerinalang.model.tree.OperatorKind;
 import org.ballerinalang.util.diagnostic.Diagnostic;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.wso2.ballerinalang.compiler.semantics.model.symbols.BSymbol;
 import org.wso2.ballerinalang.compiler.semantics.model.types.BType;
 import org.wso2.ballerinalang.compiler.tree.BLangAnnotation;
 import org.wso2.ballerinalang.compiler.tree.BLangCompilationUnit;
@@ -55,13 +56,7 @@ import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -191,10 +186,14 @@ public class TextDocumentFormatUtil {
             nodeJson.add(SYMBOL_TYPE, type);
         }
         if (node.getKind() == NodeKind.INVOCATION) {
+
             assert node instanceof BLangInvocation : node.getClass();
             BLangInvocation invocation = (BLangInvocation) node;
             if (invocation.symbol != null && invocation.symbol.kind != null) {
                 nodeJson.addProperty(INVOCATION_TYPE, invocation.symbol.kind.toString());
+                JsonArray defLink = new JsonArray();
+                getDefinitionLink(invocation.symbol, defLink);
+                nodeJson.add("definition", defLink);
             }
         }
 
@@ -323,6 +322,28 @@ public class TextDocumentFormatUtil {
             }
         }
         return nodeJson;
+    }
+
+    /**
+     * Get a list of names of the owners of the invocation node.
+     *
+     * @param symbol The symbol of which the owners are found
+     * @param owners Array of strings that will be filled with the names of owners in the chain
+     */
+    public static void getDefinitionLink(BSymbol symbol, JsonArray owners) {
+        if (symbol == null) {
+            return;
+        }
+
+        JsonArray part = new JsonArray();
+        part.add(symbol.name.value);
+        if (symbol.kind == null) {
+            part.add((JsonElement) null);
+        } else {
+            part.add(symbol.kind.name());
+        }
+        owners.add(part);
+        getDefinitionLink(symbol.owner, owners);
     }
 
     /**
