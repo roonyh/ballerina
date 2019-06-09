@@ -19,14 +19,12 @@ interface WorkerTuple { block: Block; view: WorkerViewState; }
 
 class SizingVisitor implements Visitor {
     private endpointHolder: VisibleEndpoint[] = [];
-    private endpointWidth: number = 0;
     private returnStatements: Return[] = [];
 
     public beginVisitFunction(node: BalFunction) {
-        this.endpointWidth = 0;
         const viewState: FunctionViewState = node.viewState;
         if (!node.lambda) {
-            this.endpointHolder = (node.viewState as FunctionViewState).containingVisibleEndpoints;
+            this.endpointHolder = [];
             if (node.VisibleEndpoints) {
                 this.endpointHolder = [...node.VisibleEndpoints, ...this.endpointHolder];
             }
@@ -113,17 +111,14 @@ class SizingVisitor implements Visitor {
         let lineHeight = (client.bBox.h > defaultWorker.bBox.h) ? client.bBox.h : defaultWorker.bBox.h;
         let workerWidth = 0;
         defaultWorker.initHeight = this.calcPreWorkerHeight(node.body);
-        const workers: {[s: string]: VariableDef} = {};
-        node.body!.statements.filter((element) => ASTUtil.isWorker(element)).forEach((workerEl) => {
+        const workers = node.body!.statements.filter((element) => ASTUtil.isWorker(element));
+        workers.forEach((workerEl) => {
             const worker = workerEl as VariableDef;
             this.sizeWorker(worker, defaultWorker.initHeight, workerHolder);
             if (lineHeight < worker.viewState.bBox.h) {
                 lineHeight = worker.viewState.bBox.h;
             }
             workerWidth += worker.viewState.bBox.w;
-            const workerName = ((worker.variable.initialExpression as Lambda)
-                .functionNode.viewState as WorkerViewState).name;
-            workers[workerName] = worker;
         });
         // Set Worker Arrows
         this.syncWorkerInteractions(workerHolder);
@@ -131,25 +126,26 @@ class SizingVisitor implements Visitor {
         client.bBox.h = defaultWorker.bBox.h = lineHeight;
         defaultWorker.lifeline.bBox.h = defaultWorker.bBox.h; // Set the height of lifeline.
         // Sync height of workers
-        node.body!.statements.filter((element) => ASTUtil.isWorker(element)).forEach((worker) => {
+        workers.forEach((worker) => {
             const workerViewState: WorkerViewState = worker.viewState;
             workerViewState.bBox.h = lineHeight;
             workerViewState.lifeline.bBox.h = lineHeight;
         });
 
         // Size endpoints
+        let endpointWidth = 0;
         if (this.endpointHolder) {
             this.endpointHolder.forEach((endpoint: VisibleEndpoint) => {
                 if (!endpoint.caller && endpoint.viewState.visible) {
                     endpoint.viewState.bBox.w = config.lifeLine.width;
                     endpoint.viewState.bBox.h = client.bBox.h;
-                    this.endpointWidth += endpoint.viewState.bBox.w + config.lifeLine.gutter.h;
+                    endpointWidth += endpoint.viewState.bBox.w + config.lifeLine.gutter.h;
                 }
             });
         }
 
         const lifeLinesWidth = client.bBox.w + config.lifeLine.gutter.h
-            + defaultWorker.bBox.w + this.endpointWidth + workerWidth;
+            + defaultWorker.bBox.w + endpointWidth + workerWidth;
         body.w = config.panel.padding.left + lifeLinesWidth + config.panel.padding.right;
         body.h = config.panel.padding.top + lineHeight + config.panel.padding.bottom;
 
@@ -158,6 +154,9 @@ class SizingVisitor implements Visitor {
 
         viewState.bBox.w = (body.w > header.w) ? body.w : header.w;
         viewState.bBox.h = body.h + header.h;
+        viewState.endpointsWidth = endpointWidth;
+        viewState.workerWidth = workerWidth;
+        viewState.containsOtherLifelines = workers.length > 0 || this.endpointHolder.length > 0;
 
         // Update return statement view-states.
         this.returnStatements.forEach((returnStmt) => {
@@ -420,7 +419,8 @@ class SizingVisitor implements Visitor {
         }
 
         const expandedBody = (expandedFn.body.viewState as BlockViewState).bBox;
-        const expandedDefaultWorker = (expandedFn.viewState as FunctionViewState).defaultWorker.bBox;
+        const expandedFnViewState = expandedFn.viewState as FunctionViewState;
+        const expandedDefaultWorker = expandedFnViewState.defaultWorker.bBox;
         ASTUtil.traversNode(expandedFn, new SizingVisitor());
         const sizes = config.statement.expanded;
 
@@ -429,34 +429,36 @@ class SizingVisitor implements Visitor {
         }
 
         let expandedFnWidth = expandedBody.w + expandedBody.leftMargin;
-        const workers = expandedFn.body!.statements.filter((element) => ASTUtil.isWorker(element));
+        // const workers = expandedFn.body.statements.filter((element) => ASTUtil.isWorker(element));
 
-        workers.forEach((worker) => {
-            const variable: Variable = ((worker as VariableDef).variable as Variable);
-            const lambda: Lambda = (variable.initialExpression as Lambda);
-            const fnVS = lambda.functionNode.body!.viewState as BlockViewState;
-            const leftMargin = fnVS.bBox.leftMargin > 0 ? fnVS.bBox.leftMargin : 60;
-            expandedFnWidth += (fnVS.bBox.w + leftMargin);
-        });
+        // workers.forEach((worker) => {
+        //     const variable: Variable = ((worker as VariableDef).variable as Variable);
+        //     const lambda: Lambda = (variable.initialExpression as Lambda);
+        //     const fnVS = lambda.functionNode.body!.viewState as BlockViewState;
+        //     const leftMargin = fnVS.bBox.leftMargin > 0 ? fnVS.bBox.leftMargin : 60;
+        //     expandedFnWidth += (fnVS.bBox.w + leftMargin);
+        // });
 
-        let visibleEndpoints = [];
-        if (expandedFn.VisibleEndpoints) {
-            visibleEndpoints = expandedFn.VisibleEndpoints.filter((ep) => !ep.caller && ep.viewState.visible);
-            visibleEndpoints.forEach((endpoint: VisibleEndpoint) => {
-                endpoint.viewState.bBox.w = config.lifeLine.width;
-                expandedFnWidth += (endpoint.viewState.bBox.w + config.lifeLine.gutter.h);
-            });
-            if (visibleEndpoints.length > 0) {
-                expandedFnWidth += config.lifeLine.gutter.h;
-            }
-        }
+        expandedFnWidth += expandedFnViewState.workerWidth;
 
-        const expandedFnHeight = (workers.length > 0 || visibleEndpoints.length > 0) ?
+        // let visibleEndpoints = [];
+        // if (expandedFn.VisibleEndpoints) {
+        //     visibleEndpoints = expandedFn.VisibleEndpoints.filter((ep) => !ep.caller && ep.viewState.visible);
+        //     visibleEndpoints.forEach((endpoint: VisibleEndpoint) => {
+        //         endpoint.viewState.bBox.w = config.lifeLine.width;
+        //         expandedFnWidth += (endpoint.viewState.bBox.w + config.lifeLine.gutter.h);
+        //     });
+        // }
+
+        expandedFnWidth += expandedFnViewState.endpointsWidth;
+        expandedFnWidth += sizes.rightMargin;
+
+        const expandedFnHeight = expandedFnViewState.containsOtherLifelines ?
             expandedDefaultWorker.h : expandedBody.h;
 
         viewState.bBox.h = expandedFnHeight + sizes.header + sizes.footer + sizes.bottomMargin;
         const fullLabelWidth = config.statement.padding.left + viewState.expandContext!.labelWidth
-            + config.statement.expanded.rightMargin + (2 * config.statement.expanded.labelGutter);
+            + sizes.rightMargin + (2 * sizes.labelGutter);
 
         viewState.bBox.w = expandedFnWidth > fullLabelWidth ? expandedFnWidth : fullLabelWidth;
     }
