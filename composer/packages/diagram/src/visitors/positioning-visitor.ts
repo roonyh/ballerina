@@ -139,6 +139,7 @@ class PositioningVisitor implements Visitor {
         });
 
         this.epX = workerX + config.lifeLine.gutter.h;
+        console.log(workerY, node.name.value)
         this.epY = workerY;
 
         // Position drop down menu for adding workers and endpoints
@@ -154,6 +155,29 @@ class PositioningVisitor implements Visitor {
         const viewState: BlockViewState = node.viewState;
         let height = 0;
         let workersPresent = false;
+
+        const paramEndpointFilter = (ep: VisibleEndpoint) => {
+            if (node.parent && ASTKindChecker.isFunction(node.parent)) {
+                const functionNode = (node.parent as FunctionNode);
+                const matchingParam = functionNode.parameters.find(
+                   (param) => ASTKindChecker.isVariable(param) && param.name.value === ep.name
+                );
+                return !functionNode.resource && matchingParam !== undefined;
+            }
+            return false;
+        };
+
+        if (node.VisibleEndpoints) {
+            const visibleEps = [...node.VisibleEndpoints.filter(paramEndpointFilter),
+                ...node.VisibleEndpoints.filter((ep) => !ep.caller && ep.viewState.visible)];
+            // Position endpoints
+            visibleEps
+                .forEach((endpoint: VisibleEndpoint) => {
+                    endpoint.viewState.bBox.x = this.epX;
+                    endpoint.viewState.bBox.y = this.epY;
+                    this.epX = this.epX + endpoint.viewState.bBox.w + config.lifeLine.gutter.h;
+                });
+        }
 
         node.statements.forEach((element) => {
             const elViewState: StmntViewState = element.viewState;
@@ -229,29 +253,6 @@ class PositioningVisitor implements Visitor {
         };
         viewState.hoverRect.x = viewState.bBox.x - viewState.hoverRect.leftMargin;
         viewState.hoverRect.y = viewState.bBox.y;
-
-        const paramEndpointFilter = (ep: VisibleEndpoint) => {
-            if (node.parent && ASTKindChecker.isFunction(node.parent)) {
-                const functionNode = (node.parent as FunctionNode);
-                const matchingParam = functionNode.parameters.find(
-                   (param) => ASTKindChecker.isVariable(param) && param.name.value === ep.name
-                );
-                return !functionNode.resource && matchingParam !== undefined;
-            }
-            return false;
-        };
-
-        if (node.VisibleEndpoints) {
-            const visibleEps = [...node.VisibleEndpoints.filter(paramEndpointFilter),
-                ...node.VisibleEndpoints.filter((ep) => !ep.caller && ep.viewState.visible)];
-            // Position endpoints
-            visibleEps
-                .forEach((endpoint: VisibleEndpoint) => {
-                    endpoint.viewState.bBox.x = this.epX;
-                    endpoint.viewState.bBox.y = this.epY;
-                    this.epX = this.epX + endpoint.viewState.bBox.w + config.lifeLine.gutter.h;
-                });
-        }
     }
 
     public beginVisitWhile(node: While) {
